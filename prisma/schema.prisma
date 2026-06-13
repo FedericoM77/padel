@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Auth.js tables
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(ADMIN)
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum UserRole {
+  ADMIN
+  VIEWER
+}
+
+// Dominio Padel
+model Pareja {
+  id               String    @id @default(cuid())
+  nombreJugador1   String
+  nombreJugador2   String
+  puntosRanking    Int       @default(0)
+  partidosJugados  Int       @default(0)
+  partidosGanados  Int       @default(0)
+  partidosPerdidos Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  inscripciones    Inscripcion[]
+  partidosLocal    Partido[] @relation("Local")
+  partidosVisitante Partido[] @relation("Visitante")
+  partidosGanadosList Partido[] @relation("Ganador")
+}
+
+model Torneo {
+  id           String        @id @default(cuid())
+  nombre       String
+  categoria    String
+  fechaInicio  DateTime
+  fechaFin     DateTime?
+  estado       EstadoTorneo  @default(BORRADOR)
+  formato      FormatoTorneo @default(LIGA)
+  descripcion  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  inscripciones Inscripcion[]
+  partidos      Partido[]
+}
+
+model Inscripcion {
+  id        String   @id @default(cuid())
+  torneoId  String
+  parejaId  String
+  createdAt DateTime @default(now())
+
+  torneo    Torneo   @relation(fields: [torneoId], references: [id], onDelete: Cascade)
+  pareja    Pareja   @relation(fields: [parejaId], references: [id], onDelete: Cascade)
+
+  @@unique([torneoId, parejaId])
+}
+
+model Partido {
+  id                String        @id @default(cuid())
+  torneoId          String
+  parejaLocalId     String
+  parejaVisitanteId String
+  fecha             DateTime?
+  estado            EstadoPartido @default(PENDIENTE)
+  sets              Json?
+  ganadorId         String?
+  fase              FasePartido   @default(GRUPO)
+  ronda             Int?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  torneo            Torneo  @relation(fields: [torneoId], references: [id], onDelete: Cascade)
+  parejaLocal       Pareja  @relation("Local", fields: [parejaLocalId], references: [id])
+  parejaVisitante   Pareja  @relation("Visitante", fields: [parejaVisitanteId], references: [id])
+  ganador           Pareja? @relation("Ganador", fields: [ganadorId], references: [id])
+}
+
+enum EstadoTorneo {
+  BORRADOR
+  INSCRIPCION
+  ACTIVO
+  FINALIZADO
+}
+
+enum FormatoTorneo {
+  LIGA
+  ELIMINACION_DIRECTA
+  GRUPOS_PLAYOFFS
+}
+
+enum EstadoPartido {
+  PENDIENTE
+  EN_JUEGO
+  FINALIZADO
+}
+
+enum FasePartido {
+  GRUPO
+  OCTAVOS
+  CUARTOS
+  SEMIFINAL
+  FINAL
+}
